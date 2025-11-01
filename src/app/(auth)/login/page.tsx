@@ -23,84 +23,54 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { useUserRole } from '@/hooks/use-user-role';
+import type { Role } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
-import { useAuth } from '@/lib/supabase/auth-context';
-import { supabase } from '@/lib/supabase/client';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
   const [resetEmail, setResetEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [resetLoading, setResetLoading] = useState(false);
   const router = useRouter();
-  const { signIn, resetPassword } = useAuth();
+  const { setRole } = useUserRole();
   const { toast } = useToast();
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      toast({
-        variant: 'destructive',
-        title: 'Missing Fields',
-        description: 'Please enter both email and password.',
-      });
-      return;
+  const handleLogin = () => {
+    let role: Role | null = null;
+    let redirectPath: string | null = null;
+    const input = emailOrUsername.toLowerCase();
+
+    if ((input === 'student@test.com' || input === 'student') && password === '12345678') {
+      role = 'student';
+      redirectPath = '/home';
+    } else if ((input === 'host@test.com' || input === 'host') && password === '12345678') {
+      role = 'host';
+      redirectPath = '/host';
+    } else if ((input === 'admin@test.com' || input === 'admin') && password === '12345678') {
+      role = 'admin';
+      redirectPath = '/admin';
     }
 
-    setLoading(true);
-    const { data, error } = await signIn(email, password);
-    setLoading(false);
-
-    if (error) {
+    if (role && redirectPath) {
+      setRole(role);
+      router.push(redirectPath);
+    } else {
       toast({
         variant: 'destructive',
-        title: 'Login Failed',
-        description: error.message || 'Invalid email or password.',
+        title: 'Invalid Credentials',
+        description: 'Please check your email/username and password.',
       });
-    } else if (data.user) {
-      // Fetch user role and redirect
-      const { data: userData } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', data.user.id)
-        .single();
-
-      if (userData) {
-        const redirectPath = userData.role === 'student' ? '/home' : 
-                           userData.role === 'host' ? '/host' : '/admin';
-        router.push(redirectPath);
-      }
     }
   };
 
-  const handlePasswordReset = async () => {
-    if (!resetEmail) {
-      toast({
-        variant: 'destructive',
-        title: 'Missing Email',
-        description: 'Please enter your email address.',
-      });
-      return;
-    }
-
-    setResetLoading(true);
-    const { error } = await resetPassword(resetEmail);
-    setResetLoading(false);
-
-    if (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Reset Failed',
-        description: error.message,
-      });
-    } else {
-      toast({
-        title: 'Password Reset Link Sent',
-        description: `If an account exists for ${resetEmail}, a reset link has been sent.`,
-      });
-    }
+  const handlePasswordReset = () => {
+    // UI only for now
+    toast({
+      title: 'Password Reset Link Sent',
+      description: `If an account exists for ${resetEmail}, a reset link has been sent.`,
+    });
   };
 
   return (
@@ -108,19 +78,18 @@ export default function LoginPage() {
       <CardHeader className="space-y-1 text-center">
         <CardTitle className="text-2xl">Log In</CardTitle>
         <CardDescription>
-          Enter your email below to log in to your account
+          Enter your email or username below to log in to your account
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         <div className="grid gap-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">Email or Username</Label>
           <Input
             id="email"
-            type="email"
-            placeholder="john@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={loading}
+            type="text"
+            placeholder="m@example.com or username"
+            value={emailOrUsername}
+            onChange={(e) => setEmailOrUsername(e.target.value)}
           />
         </div>
         <div className="grid gap-2">
@@ -148,22 +117,21 @@ export default function LoginPage() {
                       id="reset-email"
                       type="email"
                       className="col-span-3"
-                      placeholder="john@example.com"
+                      placeholder="m@example.com"
                       value={resetEmail}
                       onChange={(e) => setResetEmail(e.target.value)}
-                      disabled={resetLoading}
                     />
                   </div>
                 </div>
                 <DialogFooter>
                   <DialogClose asChild>
-                    <Button type="button" variant="secondary" disabled={resetLoading}>
+                    <Button type="button" variant="secondary">
                       Cancel
                     </Button>
                   </DialogClose>
-                  <Button type="submit" onClick={handlePasswordReset} disabled={resetLoading}>
-                    {resetLoading ? 'Sending...' : 'Send Reset Link'}
-                  </Button>
+                  <DialogClose asChild>
+                    <Button type="submit" onClick={handlePasswordReset}>Send Reset Link</Button>
+                  </DialogClose>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -174,13 +142,12 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-            disabled={loading}
           />
         </div>
       </CardContent>
       <CardFooter className="flex flex-col gap-4">
-        <Button className="w-full" onClick={handleLogin} disabled={loading}>
-          {loading ? 'Logging in...' : 'Log In'}
+        <Button className="w-full" onClick={handleLogin}>
+          Log In
         </Button>
         <div className="text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{' '}
