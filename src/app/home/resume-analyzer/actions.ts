@@ -34,27 +34,17 @@ export async function analyzeResumeAction(formData: FormData): Promise<{
       };
     }
 
-    // Convert PDF to text using Gemini's multimodal capabilities
+    // Extract text from PDF using pdf-parse v2
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const base64 = buffer.toString('base64');
-
-    // Use Gemini to extract text from PDF
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          mimeType: 'application/pdf',
-          data: base64,
-        },
-      },
-      'Extract all text content from this resume PDF. Provide the complete text in a structured format.',
-    ]);
-
-    const resumeText = result.response.text();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    
+    // @ts-ignore - pdf-parse is a CommonJS module
+    const { PDFParse } = require('pdf-parse');
+    
+    // Parse PDF to extract text using pdf-parse v2 API
+    const parser = new PDFParse({ data: uint8Array });
+    const result = await parser.getText();
+    const resumeText = result.text;
 
     if (!resumeText || resumeText.trim().length === 0) {
       return {
